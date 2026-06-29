@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -u
+
+export QT_QPA_PLATFORM=wayland
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=KDE
+export KDE_SESSION_VERSION=6
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
+
+# Streamlink Twitch GUI can be slow on first start while it creates config.
+sleep 2
+
+exec /usr/local/bin/run-streamlink-twitch-gui >> /tmp/streamlink-twitch-gui.log 2>&1

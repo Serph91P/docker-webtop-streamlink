@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Streamlink Twitch GUI launcher for LinuxServer Selkies / Labwc.
+
+set -u
+
+export XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}"
+export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-KDE}"
+export HOME="/config"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+mkdir -p \
+    "$HOME/Documents" \
+    "$XDG_CONFIG_HOME" \
+    "$XDG_DATA_HOME" \
+    "$XDG_CACHE_HOME" \
+    "$HOME/.config/streamlink" \
+    "$HOME/.config/streamlink-twitch-gui"
+
+cat > "$XDG_CONFIG_HOME/user-dirs.dirs" <<EOF
+XDG_DESKTOP_DIR="$HOME/Desktop"
+XDG_DOWNLOAD_DIR="$HOME/Downloads"
+XDG_TEMPLATES_DIR="$HOME/Templates"
+XDG_PUBLICSHARE_DIR="$HOME/Public"
+XDG_DOCUMENTS_DIR="$HOME/Documents"
+XDG_MUSIC_DIR="$HOME/Music"
+XDG_PICTURES_DIR="$HOME/Pictures"
+XDG_VIDEOS_DIR="$HOME/Videos"
+EOF
+
+if command -v xdg-user-dirs-update >/dev/null 2>&1; then
+    xdg-user-dirs-update || true
+fi
+
+# Default streamlink config for mpv
+default_streamlink_config="[player]
+player=mpv --force-window=immediate --cache=yes --demuxer-max-bytes=500000000 --demuxer-readahead-secs=20
+[player.passthrough]
+passthrough=http,hls,rtmp
+[stream]
+hls-segment-threads=4
+ringbuffer-size=128M"
+
+if [ ! -f "$HOME/.config/streamlink/config" ]; then
+    printf '%s\n' "$default_streamlink_config" > "$HOME/.config/streamlink/config"
+fi
+
+stg_executable="/opt/streamlink-twitch-gui/streamlink-twitch-gui"
+
+if [ -x "$stg_executable" ]; then
+    echo "[run-stg] launching: $stg_executable $*"
+    exec "$stg_executable" "$@"
+fi
+
+echo "[run-stg] ERROR: Streamlink Twitch GUI executable not found"
+echo "[run-stg] PATH=$PATH"
+echo "[run-stg] /opt matches:"
+ls -la /opt/streamlink-twitch-gui/ 2>/dev/null || true
+exit 127

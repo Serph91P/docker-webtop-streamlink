@@ -1,0 +1,145 @@
+name: Update Streamlink Twitch GUI
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: update-streamlink
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  UPSTREAM_REPO: streamlink/streamlink-twitch-gui
+  ASSET_NAME_PREFIX: streamlink-twitch-gui-v
+  ASSET_NAME_SUFFIX: -linux64.tar.gz
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check latest upstream release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_version=$(python3 - <<'PY'
+          import re
+          text = open('Dockerfile', encoding='utf-8').read()
+          match = re.search(r'^ARG STG_VERSION=(.+)$', text, re.MULTILINE)
+          if not match:
+              raise SystemExit('STG_VERSION not found in Dockerfile')
+          print(match.group(1).strip().strip('"\''))
+          PY
+          )
+
+          gh api "repos/${UPSTREAM_REPO}/releases/latest" > /tmp/upstream-release.json
+
+          latest_version=$(python3 - <<'PY'
+          import json
+          release = json.load(open('/tmp/upstream-release.json', encoding='utf-8'))
+          tag = release['tag_name']
+          print(tag.lstrip('v'))
+          PY
+          )
+
+          asset_name="${ASSET_NAME_PREFIX}${latest_version}${ASSET_NAME_SUFFIX}"
+
+          asset_url=$(python3 - <<'PY'
+          import json, os
+          release = json.load(open('/tmp/upstream-release.json', encoding='utf-8'))
+          asset_name = os.environ['ASSET_NAME']
+          for asset in release.get('assets', []):
+              if asset.get('name') == asset_name:
+                  print(asset['browser_download_url'])
+                  break
+          else:
+              raise SystemExit(f'{asset_name} not found in latest release')
+          PY
+          )
+
+          echo "current_version=${current_version}" >> "$GITHUB_OUTPUT"
+          echo "latest_version=${latest_version}" >> "$GITHUB_OUTPUT"
+          echo "asset_url=${asset_url}" >> "$GITHUB_OUTPUT"
+
+          if [ "${current_version}" = "${latest_version}" ]; then
+            echo "update_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Streamlink Twitch GUI is already up to date: ${current_version}"
+            exit 0
+          fi
+
+          curl -fsSL "${asset_url}" -o "/tmp/${asset_name}"
+          sha256=$(sha256sum "/tmp/${asset_name}" | awk '{print $1}')
+          echo "sha256=${sha256}" >> "$GITHUB_OUTPUT"
+          echo "update_needed=true" >> "$GITHUB_OUTPUT"
+          echo "Update found: ${current_version} -> ${latest_version}"
+          echo "SHA256: ${sha256}"
+
+      - name: Update version files
+        if: steps.upstream.outputs.update_needed == 'true'
+        env:
+          LATEST_VERSION: ${{ steps.upstream.outputs.latest_version }}
+          STG_SHA256: ${{ steps.upstream.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ['LATEST_VERSION']
+          sha256 = os.environ['STG_SHA256']
+
+          replacements = {
+              Path('Dockerfile'): [
+                  (r'^ARG STG_VERSION=.+$', f'ARG STG_VERSION={version}'),
+                  (r'^ARG STG_SHA256=.+$', f'ARG STG_SHA256={sha256}'),
+              ],
+              Path('README.md'): [
+                  (r'`[0-9A-Za-z_.-]+-ls1`', f'`{version}-ls1`'),
+              ],
+          }
+
+          for path, rules in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              for pattern, replacement in rules:
+                  text, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+                  if count != 1:
+                      raise SystemExit(f'Pattern not found in {path}: {pattern}')
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit update
+        if: steps.upstream.outputs.update_needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Dockerfile README.md
+          git commit -m "chore: update Streamlink Twitch GUI to ${{ steps.upstream.outputs.latest_version }}"
+          git push origin HEAD:main
+
+      - name: Start release workflow
+        if: steps.upstream.outputs.update_needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --ref main -f update_store=true

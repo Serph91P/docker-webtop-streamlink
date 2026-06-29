@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      update_store:
+        description: Update Serph91P/sealskin-store after build
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: docker-webtop-streamlink
+  STORE_REPOSITORY: Serph91P/sealskin-store
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Prepare metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t metadata < <(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path('Dockerfile').read_text()
+          version_match = re.search(r'^ARG STG_VERSION=(.+)$', text, re.MULTILINE)
+          sha_match = re.search(r'^ARG STG_SHA256=(.+)$', text, re.MULTILINE)
+          if not version_match:
+              raise SystemExit('STG_VERSION not found in Dockerfile')
+          if not sha_match:
+              raise SystemExit('STG_SHA256 not found in Dockerfile')
+
+          print(version_match.group(1).strip())
+          print(sha_match.group(1).strip())
+          PY
+          )
+
+          if ((${#metadata[@]} != 2)); then
+            echo "Failed to extract STG version/SHA from Dockerfile" >&2
+            exit 1
+          fi
+
+          STG_VERSION="${metadata[0]}"
+          STG_SHA256="${metadata[1]}"
+          if [ -z "${STG_VERSION}" ] || [ -z "${STG_SHA256}" ]; then
+            echo "Parsed STG metadata is empty" >&2
+            exit 1
+          fi
+
+          IMAGE="${REGISTRY}/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/${IMAGE_NAME}"
+          RELEASE_TAG="${STG_VERSION}-ls${GITHUB_RUN_NUMBER}"
+
+          echo "stg_version=${STG_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "stg_sha256=${STG_SHA256}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push git tag
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.meta.outputs.release_tag }}"
+          git push origin "${{ steps.meta.outputs.release_tag }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.stg_version }}
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.release_tag }}
+          labels: |
+            org.opencontainers.image.title=docker-webtop-streamlink
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.release_tag }}
+          build-args: |
+            CACHE_BUST=${{ github.sha }}-${{ github.run_id }}
+            STG_VERSION=${{ steps.meta.outputs.stg_version }}
+            STG_SHA256=${{ steps.meta.outputs.stg_sha256 }}
+          no-cache: true
+          cache-from: type=gha,scope=streamlink
+          cache-to: type=gha,mode=max,scope=streamlink
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.meta.outputs.release_tag }}
+          generate_release_notes: true
+          body: |
+            ## Docker image
+
+            ```bash
+            docker pull ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.release_tag }}
+            docker pull ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+            ```
+
+      - name: Update Sealskin store
+        if: ${{ github.event_name == 'push' || inputs.update_store }}
+        env:
+          GH_TOKEN: ${{ secrets.STORE_DISPATCH_TOKEN }}
+          STORE_IMAGE: ${{ steps.meta.outputs.image }}
+          STORE_TAG: ${{ steps.meta.outputs.release_tag }}
+          STORE_DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "STORE_DISPATCH_TOKEN is not configured. Skipping store update."
+            exit 0
+          fi
+          python3 - <<'PY' > /tmp/store-dispatch.json
+          import json
+          import os
+
+          payload = {
+              "event_type": "update-app-image",
+              "client_payload": {
+                  "app_id": "webtop-streamlink",
+                  "image": os.environ["STORE_IMAGE"],
+                  "tag": os.environ["STORE_TAG"],
+                  "digest": os.environ["STORE_DIGEST"],
+              },
+          }
+          print(json.dumps(payload))
+          PY
+          gh api "repos/${STORE_REPOSITORY}/dispatches" --method POST --input /tmp/store-dispatch.json

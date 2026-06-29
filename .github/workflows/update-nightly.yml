@@ -1,0 +1,65 @@
+name: Nightly mpv / streamlink update
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  check-arch-updates:
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+    steps:
+      - name: Check Arch package updates
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use Arch Linux package search API to see if mpv or streamlink was updated recently.
+          # If the last modified timestamp changed since the last image build, trigger a rebuild.
+          # For simplicity, always trigger a cache-bust rebuild on schedule; the Dockerfile layer
+          # caching will skip unchanged layers.  We do this by pushing a no-op commit to main.
+          echo "has_updates=true" >> "$GITHUB_OUTPUT"
+
+  rebuild:
+    needs: check-arch-updates
+    if: needs.check-arch-updates.outputs.has_updates == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump cache bust
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .cache-bust
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .cache-bust
+          git commit -m "chore: nightly cache bust $(date -u +%Y-%m-%d)" || true
+          git push origin HEAD:main
+
+      - name: Start release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --ref main -f update_store=true
