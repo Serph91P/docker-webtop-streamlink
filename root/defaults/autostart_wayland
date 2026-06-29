@@ -1,29 +1,77 @@
 #!/usr/bin/env bash
 
-set -u
-
-export QT_QPA_PLATFORM=wayland
-export XDG_SESSION_TYPE=wayland
-export XDG_CURRENT_DESKTOP=KDE
-export KDE_SESSION_VERSION=6
+export HOME="/config"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 export DISPLAY=:0
 
-# Wait for XWayland socket to appear (XWayland starts on-demand in labwc)
-for i in $(seq 1 30); do
-    if [ -S /tmp/.X11-unix/X0 ]; then
-        echo "[autostart] XWayland ready on DISPLAY=$DISPLAY"
-        break
-    fi
-    echo "[autostart] waiting for XWayland ($i/30)..."
-    sleep 1
-done
+LOG="/tmp/streamlink-twitch-gui.log"
+echo "[autostart] === START === $(date)" >> "$LOG"
+echo "[autostart] HOME=$HOME" >> "$LOG"
+echo "[autostart] WHOAMI=$(whoami)" >> "$LOG"
+echo "[autostart] labwc pid=$(pgrep labwc || echo NONE)" >> "$LOG"
 
-if [ ! -S /tmp/.X11-unix/X0 ]; then
-    echo "[autostart] WARNING: XWayland socket not found, trying anyway"
+# Wait for labwc to be fully up
+sleep 3
+
+# Make sure streamlink config dirs exist
+mkdir -p "$HOME/.config/streamlink" "$HOME/.config/streamlink-twitch-gui"
+
+# Default streamlink config
+if [ ! -f "$HOME/.config/streamlink/config" ]; then
+    cat > "$HOME/.config/streamlink/config" <<'EOF'
+[player]
+player=mpv --force-window=immediate --cache=yes
+[stream]
+hls-segment-threads=4
+EOF
 fi
 
-# Streamlink Twitch GUI can be slow on first start while it creates config.
-sleep 2
+STG="/opt/streamlink-twitch-gui/streamlink-twitch-gui"
 
-exec /usr/local/bin/run-streamlink-twitch-gui >> /tmp/streamlink-twitch-gui.log 2>&1
+if [ ! -x "$STG" ]; then
+    echo "[autostart] ERROR: $STG not executable" >> "$LOG"
+    # Fallback: keep labwc alive with a simple process so the user sees something
+    exec sleep infinity
+fi
+
+# NW.js/Chromium flags for container/XWayland
+FLAGS=(
+    --ozone-platform=x11
+    --no-sandbox
+    --disable-gpu-sandbox
+    --disable-setuid-sandbox
+    --disable-dev-shm-usage
+    --disable-gpu
+    --no-first-run
+    --no-default-browser-check
+    --disable-background-networking
+    --disable-background-timer-throttling
+    --disable-default-apps
+    --disable-hang-monitor
+    --disable-popup-blocking
+    --disable-prompt-on-repost
+    --disable-sync
+    --force-color-profile=srgb
+    --password-store=basic
+    --use-mock-keychain
+)
+
+echo "[autostart] launching: $STG ${FLAGS[*]}" >> "$LOG"
+
+# Do NOT use exec — if NW.js crashes we want labwc to stay alive
+"$STG" "${FLAGS[@]}" >> "$LOG" 2>&1 &
+STG_PID=$!
+
+echo "[autostart] STG PID=$STG_PID" >> "$LOG"
+
+# Keep this script running so labwc does not treat autostart as finished
+# and potentially close the session.
+wait "$STG_PID"
+EXIT=$?
+echo "[autostart] STG exited with code $EXIT" >> "$LOG"
+
+# If it exited quickly, keep the session alive so the user can check logs
+sleep infinity
