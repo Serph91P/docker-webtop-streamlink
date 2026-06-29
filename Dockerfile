@@ -24,15 +24,24 @@ RUN set -eux; \
     echo "**** install runtime packages ****"; \
     pacman -Sy --noconfirm --needed \
         alsa-lib \
+        at-spi2-core \
         ca-certificates \
         chromium \
         curl \
         dbus \
         ffmpeg \
         glib2 \
+        gtk2 \
         gtk3 \
+        libdrm \
         libevdev \
         libnotify \
+        libxcomposite \
+        libxdamage \
+        libxrandr \
+        libxss \
+        libxtst \
+        mesa \
         mpv \
         nss \
         streamlink \
