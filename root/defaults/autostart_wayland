@@ -8,7 +8,11 @@ export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 export DISPLAY=:0
 
 LOG="/tmp/streamlink-twitch-gui.log"
-echo "[autostart] === START === $(date)" >> "$LOG"
+echo "[autostart] === START === $(date)" | tee -a "$LOG"
+echo "[autostart] autostart file: $(readlink -f "$0")" | tee -a "$LOG"
+echo "[autostart] running as: $(whoami) uid=$(id -u)" | tee -a "$LOG"
+echo "[autostart] labwc pid: $(pgrep labwc || echo NONE)" | tee -a "$LOG"
+echo "[autostart] WAYLAND_DISPLAY=$WAYLAND_DISPLAY DISPLAY=$DISPLAY" | tee -a "$LOG"
 
 sleep 3
 
