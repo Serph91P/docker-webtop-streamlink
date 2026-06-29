@@ -64,7 +64,6 @@ chromium_flags=(
     --disable-setuid-sandbox
     --disable-dev-shm-usage
     --disable-gpu
-    --disable-software-rasterizer
     --disable-features=UseChromeMLambda
 )
 

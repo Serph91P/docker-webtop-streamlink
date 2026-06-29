@@ -9,6 +9,20 @@ export KDE_SESSION_VERSION=6
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 export DISPLAY=:0
 
+# Wait for XWayland socket to appear (XWayland starts on-demand in labwc)
+for i in $(seq 1 30); do
+    if [ -S /tmp/.X11-unix/X0 ]; then
+        echo "[autostart] XWayland ready on DISPLAY=$DISPLAY"
+        break
+    fi
+    echo "[autostart] waiting for XWayland ($i/30)..."
+    sleep 1
+done
+
+if [ ! -S /tmp/.X11-unix/X0 ]; then
+    echo "[autostart] WARNING: XWayland socket not found, trying anyway"
+fi
+
 # Streamlink Twitch GUI can be slow on first start while it creates config.
 sleep 2
 
