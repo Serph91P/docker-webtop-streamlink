@@ -20,7 +20,7 @@ ENV TITLE="Streamlink Twitch GUI" \
     NO_DECOR=true
 
 RUN set -eux; \
-    echo "**** cache bust ${CACHE_BUST} ****"; \
+    echo "**** cache bust ${CACHE_BUST:-none} ****"; \
     echo "**** install runtime packages ****"; \
     pacman -Sy --noconfirm --needed \
         alsa-lib \
