@@ -31,7 +31,6 @@ RUN set -eux; \
         dbus \
         ffmpeg \
         glib2 \
-        gtk2 \
         gtk3 \
         libdrm \
         libevdev \
