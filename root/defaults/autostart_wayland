@@ -9,14 +9,10 @@ export DISPLAY=:0
 
 LOG="/tmp/streamlink-twitch-gui.log"
 echo "[autostart] === START === $(date)" >> "$LOG"
-echo "[autostart] HOME=$HOME" >> "$LOG"
-echo "[autostart] WHOAMI=$(whoami)" >> "$LOG"
-echo "[autostart] labwc pid=$(pgrep labwc || echo NONE)" >> "$LOG"
 
-# Wait for labwc to be fully up
 sleep 3
 
-# Make sure streamlink config dirs exist
+# Config dirs
 mkdir -p "$HOME/.config/streamlink" "$HOME/.config/streamlink-twitch-gui"
 
 # Default streamlink config
@@ -32,19 +28,26 @@ fi
 STG="/opt/streamlink-twitch-gui/streamlink-twitch-gui"
 
 if [ ! -x "$STG" ]; then
-    echo "[autostart] ERROR: $STG not executable" >> "$LOG"
-    # Fallback: keep labwc alive with a simple process so the user sees something
-    exec sleep infinity
+    echo "[autostart] ERROR: $STG not found" >> "$LOG"
+    sleep infinity
 fi
 
-# NW.js/Chromium flags for container/XWayland
+# Remove stale Chromium SingletonLock files from previous crashed runs
+# so NW.js can start even if it didn't shut down cleanly.
+STG_PROFILE="$HOME/.config/streamlink-twitch-gui"
+for lock in SingletonLock SingletonSocket SingletonCookie; do
+    if [ -e "$STG_PROFILE/$lock" ]; then
+        echo "[autostart] removing stale $lock" >> "$LOG"
+        rm -f "$STG_PROFILE/$lock"
+    fi
+done
+
 FLAGS=(
     --ozone-platform=x11
     --no-sandbox
     --disable-gpu-sandbox
     --disable-setuid-sandbox
     --disable-dev-shm-usage
-    --disable-gpu
     --no-first-run
     --no-default-browser-check
     --disable-background-networking
@@ -61,17 +64,13 @@ FLAGS=(
 
 echo "[autostart] launching: $STG ${FLAGS[*]}" >> "$LOG"
 
-# Do NOT use exec — if NW.js crashes we want labwc to stay alive
+# Keep labwc session alive even if app crashes
 "$STG" "${FLAGS[@]}" >> "$LOG" 2>&1 &
 STG_PID=$!
 
-echo "[autostart] STG PID=$STG_PID" >> "$LOG"
-
-# Keep this script running so labwc does not treat autostart as finished
-# and potentially close the session.
 wait "$STG_PID"
 EXIT=$?
-echo "[autostart] STG exited with code $EXIT" >> "$LOG"
+echo "[autostart] STG exited code $EXIT" >> "$LOG"
 
-# If it exited quickly, keep the session alive so the user can check logs
+# Keep session alive for debugging
 sleep infinity
