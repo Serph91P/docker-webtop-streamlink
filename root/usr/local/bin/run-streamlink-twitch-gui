@@ -48,6 +48,18 @@ fi
 
 stg_executable="/opt/streamlink-twitch-gui/streamlink-twitch-gui"
 
+# Set Chromium as default browser for OAuth login
+if command -v chromium >/dev/null 2>&1; then
+    export BROWSER="chromium"
+    # Create xdg-mime association so streamlink-twitch-gui opens URLs in Chromium
+    mkdir -p "$XDG_CONFIG_HOME/mimeapps.list"
+    cat > "$XDG_CONFIG_HOME/mimeapps.list" <<EOF
+[Default Applications]
+x-scheme-handler/http=chromium.desktop
+x-scheme-handler/https=chromium.desktop
+EOF
+fi
+
 if [ -x "$stg_executable" ]; then
     echo "[run-stg] launching: $stg_executable $*"
     exec "$stg_executable" "$@"

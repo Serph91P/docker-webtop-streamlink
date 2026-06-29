@@ -25,6 +25,7 @@ RUN set -eux; \
     pacman -Sy --noconfirm --needed \
         alsa-lib \
         ca-certificates \
+        chromium \
         curl \
         dbus \
         ffmpeg \
