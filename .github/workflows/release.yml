@@ -68,20 +68,16 @@ jobs:
           fi
 
           IMAGE="${REGISTRY}/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/${IMAGE_NAME}"
-          RELEASE_TAG="${STG_VERSION}-ls${GITHUB_RUN_NUMBER}"
+
+          # Use run_number for sequential tagging, but prefix with date for readability
+          # Format: 2.5.3-20250629.11 (date + run number)
+          DATE=$(date +%Y%m%d)
+          RELEASE_TAG="${STG_VERSION}-${DATE}.${GITHUB_RUN_NUMBER}"
 
           echo "stg_version=${STG_VERSION}" >> "$GITHUB_OUTPUT"
           echo "stg_sha256=${STG_SHA256}" >> "$GITHUB_OUTPUT"
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
           echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Create and push git tag
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.meta.outputs.release_tag }}"
-          git push origin "${{ steps.meta.outputs.release_tag }}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -115,6 +111,14 @@ jobs:
           no-cache: true
           cache-from: type=gha,scope=streamlink
           cache-to: type=gha,mode=max,scope=streamlink
+
+      - name: Create and push git tag
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.meta.outputs.release_tag }}"
+          git push origin "${{ steps.meta.outputs.release_tag }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
