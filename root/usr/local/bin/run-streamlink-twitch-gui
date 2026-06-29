@@ -10,6 +10,13 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
+# NW.js / Chromium flags for headless XWayland (labwc / selkies)
+export NW_OZONE_PLATFORM="x11"
+export CHROME_DEVEL_SANDBOX=""
+export GOOGLE_API_KEY="no"
+export GOOGLE_DEFAULT_CLIENT_ID="no"
+export GOOGLE_DEFAULT_CLIENT_SECRET="no"
+
 mkdir -p \
     "$HOME/Documents" \
     "$XDG_CONFIG_HOME" \
@@ -48,9 +55,22 @@ fi
 
 stg_executable="/opt/streamlink-twitch-gui/streamlink-twitch-gui"
 
+# Chromium / NW.js flags for container Wayland/X11 environments
+# Use XWayland (ozone-platform=x11) for better compatibility with labwc
+chromium_flags=(
+    --ozone-platform=x11
+    --no-sandbox
+    --disable-gpu-sandbox
+    --disable-setuid-sandbox
+    --disable-dev-shm-usage
+    --disable-gpu
+    --disable-software-rasterizer
+    --disable-features=UseChromeMLambda
+)
+
 if [ -x "$stg_executable" ]; then
-    echo "[run-stg] launching: $stg_executable $*"
-    exec "$stg_executable" "$@"
+    echo "[run-stg] launching: $stg_executable ${chromium_flags[*]} $*"
+    exec "$stg_executable" "${chromium_flags[@]}" "$@"
 fi
 
 echo "[run-stg] ERROR: Streamlink Twitch GUI executable not found"

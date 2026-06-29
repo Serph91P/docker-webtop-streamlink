@@ -37,7 +37,8 @@ RUN set -eux; \
         streamlink \
         ttf-font \
         xdg-user-dirs \
-        xdg-utils; \
+        xdg-utils \
+        xorg-xwayland; \
     echo "**** install Streamlink Twitch GUI ****"; \
     curl -fsSL -o /tmp/streamlink-twitch-gui.tar.gz \
         "https://github.com/streamlink/streamlink-twitch-gui/releases/download/v${STG_VERSION}/streamlink-twitch-gui-v${STG_VERSION}-linux64.tar.gz"; \
