@@ -32,19 +32,24 @@ fi
 STG="/opt/streamlink-twitch-gui/streamlink-twitch-gui"
 
 if [ ! -x "$STG" ]; then
-    echo "[autostart] ERROR: $STG not found" >> "$LOG"
+    echo "[autostart] ERROR: $STG not found" | tee -a "$LOG"
     sleep infinity
 fi
 
 # Remove stale Chromium SingletonLock files from previous crashed runs
 # so NW.js can start even if it didn't shut down cleanly.
 STG_PROFILE="$HOME/.config/streamlink-twitch-gui"
-for lock in SingletonLock SingletonSocket SingletonCookie; do
-    if [ -e "$STG_PROFILE/$lock" ]; then
-        echo "[autostart] removing stale $lock" >> "$LOG"
-        rm -f "$STG_PROFILE/$lock"
-    fi
-done
+cleanup_locks() {
+    echo "[autostart] cleaning locks in $STG_PROFILE" | tee -a "$LOG"
+    for lock in SingletonLock SingletonSocket SingletonCookie; do
+        if [ -e "$STG_PROFILE/$lock" ] || [ -L "$STG_PROFILE/$lock" ]; then
+            echo "[autostart] removing stale $lock" | tee -a "$LOG"
+            rm -rf "$STG_PROFILE/$lock"
+        fi
+    done
+    # Also remove NW.js temp socket dirs that might be left over
+    rm -rf /tmp/.io.nwjs.* 2>/dev/null || true
+}
 
 FLAGS=(
     --ozone-platform=x11
@@ -66,15 +71,23 @@ FLAGS=(
     --use-mock-keychain
 )
 
-echo "[autostart] launching: $STG ${FLAGS[*]}" >> "$LOG"
+# Try up to 3 times: clean locks, launch, if exit 21 clean and retry
+for attempt in 1 2 3; do
+    cleanup_locks
+    echo "[autostart] launching (attempt $attempt): $STG ${FLAGS[*]}" | tee -a "$LOG"
 
-# Keep labwc session alive even if app crashes
-"$STG" "${FLAGS[@]}" >> "$LOG" 2>&1 &
-STG_PID=$!
+    "$STG" "${FLAGS[@]}" >> "$LOG" 2>&1
+    EXIT=$?
+    echo "[autostart] STG exited code $EXIT (attempt $attempt)" | tee -a "$LOG"
 
-wait "$STG_PID"
-EXIT=$?
-echo "[autostart] STG exited code $EXIT" >> "$LOG"
+    if [ "$EXIT" -ne 21 ]; then
+        break
+    fi
+    echo "[autostart] exit 21 = profile locked, retrying after cleanup..." | tee -a "$LOG"
+    sleep 2
+done
+
+echo "[autostart] final exit code: $EXIT" | tee -a "$LOG"
 
 # Keep session alive for debugging
 sleep infinity
