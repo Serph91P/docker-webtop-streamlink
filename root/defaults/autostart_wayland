@@ -16,6 +16,13 @@ echo "[autostart] WAYLAND_DISPLAY=$WAYLAND_DISPLAY DISPLAY=$DISPLAY" | tee -a "$
 
 sleep 3
 
+# Make our OAuth URL visible
+echo "[autostart] OAuth URLs will be logged to /tmp/streamlink-twitch-gui.log" | tee -a "$LOG"
+
+# Override xdg-open for OAuth in headless container
+export PATH="/usr/local/bin:$PATH"
+mkdir -p "$HOME/.config/xdg-settings"
+
 # Config dirs
 mkdir -p "$HOME/.config/streamlink" "$HOME/.config/streamlink-twitch-gui"
 

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Wrapper for xdg-open in headless container.
+# NW.js calls xdg-open for OAuth URLs. Since there's no real display,
+# we log the URL and show a desktop notification.
+
+URL="$1"
+LOG="/tmp/streamlink-twitch-gui.log"
+
+echo "[xdg-open] OAUTH URL: $URL" | tee -a "$LOG"
+
+# Try to show a notification in the container
+echo "[xdg-open] ==========================================" | tee -a "$LOG"
+echo "[xdg-open] OAUTH LOGIN REQUIRED" | tee -a "$LOG"
+echo "[xdg-open] Open this URL in your browser:" | tee -a "$LOG"
+echo "[xdg-open] $URL" | tee -a "$LOG"
+echo "[xdg-open] ==========================================" | tee -a "$LOG"
+
+# Also write to a file for easy access
+echo "$URL" > /tmp/oauth-url.txt
+
+# Try notify-send if available
+notify-send "Streamlink Twitch GUI" "OAuth URL copied to /tmp/oauth-url.txt" 2>/dev/null || true
+
+exit 0

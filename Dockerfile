@@ -38,7 +38,12 @@ RUN set -eux; \
         ttf-font \
         xdg-user-dirs \
         xdg-utils \
-        xorg-xwayland; \
+        xorg-xwayland \
+        chromium; \
+    echo "**** set chromium as default browser for OAuth ****"; \
+    mkdir -p /config/.config/xdg-settings; \
+    xdg-settings set default-web-browser chromium.desktop 2>/dev/null || true; \
+    ln -sf /usr/bin/chromium /usr/local/bin/chromium-browser 2>/dev/null || true; \
     echo "**** install Streamlink Twitch GUI ****"; \
     curl -fsSL -o /tmp/streamlink-twitch-gui.tar.gz \
         "https://github.com/streamlink/streamlink-twitch-gui/releases/download/v${STG_VERSION}/streamlink-twitch-gui-v${STG_VERSION}-linux64.tar.gz"; \
