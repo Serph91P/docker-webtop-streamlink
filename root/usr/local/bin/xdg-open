@@ -1,24 +1,58 @@
 #!/usr/bin/env bash
-# Wrapper for xdg-open in headless container.
-# NW.js calls xdg-open for OAuth URLs. Since there's no real display,
-# we log the URL and show a desktop notification.
+# Wrapper for xdg-open in Selkies webtop container.
+# NW.js calls xdg-open for OAuth URLs. We launch chromium inside the
+# container so the user can complete login in a real browser window.
 
 URL="$1"
 LOG="/tmp/streamlink-twitch-gui.log"
 
-echo "[xdg-open] OAUTH URL: $URL" | tee -a "$LOG"
+echo "[xdg-open] URL: $URL" | tee -a "$LOG"
 
-# Try to show a notification in the container
+# Ensure DISPLAY is set for X11 mode
+export DISPLAY="${DISPLAY:-:0}"
+
+# Prefer chromium inside the container so the user sees a real window
+BROWSER=""
+for cmd in chromium chromium-browser google-chrome; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+        BROWSER="$cmd"
+        break
+    fi
+done
+
+if [ -n "$BROWSER" ]; then
+    echo "[xdg-open] Launching $BROWSER with URL" | tee -a "$LOG"
+    nohup "$BROWSER" \
+        --ozone-platform=x11 \
+        --no-sandbox \
+        --disable-gpu-sandbox \
+        --disable-setuid-sandbox \
+        --disable-dev-shm-usage \
+        --no-first-run \
+        --no-default-browser-check \
+        --disable-background-networking \
+        --disable-background-timer-throttling \
+        --disable-default-apps \
+        --disable-hang-monitor \
+        --disable-popup-blocking \
+        --disable-prompt-on-repost \
+        --disable-sync \
+        --force-color-profile=srgb \
+        --password-store=basic \
+        --use-mock-keychain \
+        "$URL" > /tmp/chromium-oauth.log 2>&1 &
+    echo "[xdg-open] Chromium PID: $!" | tee -a "$LOG"
+    exit 0
+fi
+
+# Fallback: save URL and notify
+echo "$URL" > /tmp/oauth-url.txt
 echo "[xdg-open] ==========================================" | tee -a "$LOG"
 echo "[xdg-open] OAUTH LOGIN REQUIRED" | tee -a "$LOG"
 echo "[xdg-open] Open this URL in your browser:" | tee -a "$LOG"
 echo "[xdg-open] $URL" | tee -a "$LOG"
 echo "[xdg-open] ==========================================" | tee -a "$LOG"
 
-# Also write to a file for easy access
-echo "$URL" > /tmp/oauth-url.txt
-
-# Try notify-send if available
 notify-send "Streamlink Twitch GUI" "OAuth URL copied to /tmp/oauth-url.txt" 2>/dev/null || true
 
 exit 0
