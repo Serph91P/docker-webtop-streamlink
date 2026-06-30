@@ -28,14 +28,16 @@ TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 # Streamlink Twitch GUI's public client ID
 CLIENT_ID = "phiay4sq36lfv9zu7cbqwzkgndm8q43"
 
-# Required scopes for Streamlink Twitch GUI
+# Required scopes for Streamlink Twitch GUI (exactly what the app requests)
 SCOPES = [
-    "user:read:email",
+    "user:manage:blocked_users",
+    "user:read:blocked_users",
     "user:read:follows",
-    "user:edit:follows",
     "user:read:subscriptions",
-    "chat:read",
     "chat:edit",
+    "chat:read",
+    "whispers:edit",
+    "whispers:read",
 ]
 
 
