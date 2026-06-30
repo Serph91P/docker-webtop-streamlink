@@ -25,8 +25,6 @@ if [ -n "$BROWSER" ]; then
     nohup "$BROWSER" \
         --ozone-platform=x11 \
         --no-sandbox \
-        --disable-gpu-sandbox \
-        --disable-setuid-sandbox \
         --disable-dev-shm-usage \
         --no-first-run \
         --no-default-browser-check \
@@ -40,6 +38,9 @@ if [ -n "$BROWSER" ]; then
         --force-color-profile=srgb \
         --password-store=basic \
         --use-mock-keychain \
+        --disable-blink-features=AutomationControlled \
+        --disable-features=IsolateOrigins,site-per-process \
+        --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36" \
         "$URL" > /tmp/chromium-oauth.log 2>&1 &
     echo "[xdg-open] Chromium PID: $!" | tee -a "$LOG"
     exit 0
