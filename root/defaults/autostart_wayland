@@ -59,13 +59,12 @@ cleanup_locks() {
 }
 
 FLAGS=(
-    --ozone-platform=x11
+    --ozone-platform=wayland
+    --enable-features=UseOzonePlatform
     --no-sandbox
     --disable-gpu-sandbox
     --disable-setuid-sandbox
     --disable-dev-shm-usage
-    --disable-gpu
-    --disable-features=UseChromeMLambda
     --no-first-run
     --no-default-browser-check
     --disable-background-networking
