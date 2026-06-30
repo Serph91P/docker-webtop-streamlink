@@ -2,9 +2,6 @@
 """
 Twitch OAuth Token Generator for Streamlink Twitch GUI
 Run this on your PC (not in the container) to get a compatible token.
-
-The token uses Streamlink Twitch GUI's exact client ID, so it will be
-accepted by the application.
 """
 
 import json
@@ -16,10 +13,11 @@ import sys
 
 DEVICE_CODE_URL = "https://id.twitch.tv/oauth2/device"
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
+
 # Streamlink Twitch GUI's public client ID
 CLIENT_ID = "phiay4sq36lfv9zu7cbqwzkgndm8q43"
 
-# Required scopes for Streamlink Twitch GUI (exactly what the app requests)
+# Exact scopes the GUI requires
 SCOPES = [
     "user:manage:blocked_users",
     "user:read:blocked_users",
@@ -41,8 +39,13 @@ def request_device_code():
     req = urllib.request.Request(DEVICE_CODE_URL, data=data, method="POST")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
 
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        print(f"Error {e.code}: {body}", file=sys.stderr)
+        sys.exit(1)
 
 
 def poll_for_token(device_code, interval=5, max_attempts=60):
@@ -67,17 +70,16 @@ def poll_for_token(device_code, interval=5, max_attempts=60):
             error = body.get("message", body.get("error", "unknown"))
 
             if error == "authorization_pending":
-                print(f"  Waiting for authorization... ({attempt + 1}/{max_attempts})")
+                print(f"  Waiting... ({attempt + 1}/{max_attempts})")
                 continue
             elif error == "slow_down":
                 interval += 5
-                print(f"  Slowing down... (interval={interval}s)")
                 continue
             else:
                 print(f"Error: {error}", file=sys.stderr)
                 return None
 
-    print("Timeout. You did not authorize in time.", file=sys.stderr)
+    print("Timeout.", file=sys.stderr)
     return None
 
 
@@ -87,23 +89,20 @@ def main():
     print("=" * 60)
     print()
 
-    print("Requesting device code from Twitch...")
     device_info = request_device_code()
 
     user_code = device_info["user_code"]
     verification_uri = device_info["verification_uri"]
     device_code = device_info["device_code"]
-    expires_in = device_info["expires_in"]
 
-    print()
     print("-" * 60)
-    print("STEP 1: Open this URL in your browser (PC or phone):")
+    print("STEP 1: Open this URL in your browser:")
     print(f"  {verification_uri}")
     print()
     print(f"STEP 2: Enter this code: {user_code}")
     print("-" * 60)
     print()
-    print(f"You have {expires_in} seconds. Waiting...")
+    print("Waiting for authorization...")
     print()
 
     result = poll_for_token(device_code)
@@ -112,26 +111,20 @@ def main():
         token = result["access_token"]
         print()
         print("=" * 60)
-        print("SUCCESS! Here is your token:")
+        print("SUCCESS! Copy this token:")
         print("=" * 60)
         print()
         print(token)
         print()
         print("=" * 60)
         print()
-        print("How to use it:")
-        print("  1. In Streamlink Twitch GUI, click 'Login'")
-        print("  2. Click 'Use Access Token' (or 'Zugangscode verwenden')")
-        print("  3. Paste the token above")
-        print("  4. Click OK / Apply")
-        print()
-        print("NOTE: If the token starts with 'oauth:', paste WITHOUT that prefix.")
-        print("      Paste only the part AFTER 'oauth:' if present.")
+        print("In Streamlink Twitch GUI:")
+        print("  Login -> 'Zugangscode verwenden'")
+        print("  Paste the token above")
         print()
         return 0
     else:
-        print()
-        print("Failed to get token. Please try again.")
+        print("Failed.")
         return 1
 
 
