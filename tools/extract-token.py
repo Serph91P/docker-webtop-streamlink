@@ -25,8 +25,11 @@ def find_config_dirs():
     if system == "Windows":
         appdata_local = os.environ.get("LOCALAPPDATA", os.path.join(home, "AppData", "Local"))
         appdata_roaming = os.environ.get("APPDATA", os.path.join(home, "AppData", "Roaming"))
+        # Main config dirs
         dirs.append(os.path.join(appdata_local, "streamlink-twitch-gui"))
         dirs.append(os.path.join(appdata_roaming, "streamlink-twitch-gui"))
+        # NW.js/Chromium profile dirs (where localStorage actually lives on Windows)
+        dirs.append(os.path.join(appdata_local, "streamlink-twitch-gui", "User Data", "Default"))
     elif system == "Darwin":
         dirs.append(os.path.join(home, "Library", "Application Support", "streamlink-twitch-gui"))
     else:
