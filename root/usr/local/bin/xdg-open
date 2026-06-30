@@ -11,14 +11,24 @@ echo "[xdg-open] URL: $URL" | tee -a "$LOG"
 # Ensure DISPLAY is set for X11 mode
 export DISPLAY="${DISPLAY:-:0}"
 
-# Prefer chromium inside the container so the user sees a real window
+# Prefer firefox inside the container so the user sees a real window
 BROWSER=""
-for cmd in chromium chromium-browser google-chrome; do
+for cmd in firefox chromium chromium-browser google-chrome; do
     if command -v "$cmd" >/dev/null 2>&1; then
         BROWSER="$cmd"
         break
     fi
 done
+
+if [ -n "$BROWSER" ] && [ "$BROWSER" = "firefox" ]; then
+    echo "[xdg-open] Launching Firefox with URL" | tee -a "$LOG"
+    nohup "$BROWSER" \
+        --no-remote \
+        --new-instance \
+        "$URL" > /tmp/firefox-oauth.log 2>&1 &
+    echo "[xdg-open] Firefox PID: $!" | tee -a "$LOG"
+    exit 0
+fi
 
 if [ -n "$BROWSER" ]; then
     echo "[xdg-open] Launching $BROWSER with URL" | tee -a "$LOG"
