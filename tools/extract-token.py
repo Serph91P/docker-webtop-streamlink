@@ -12,21 +12,24 @@ import sys
 import platform
 
 
-def find_config_dir():
-    """Find Streamlink Twitch GUI config directory on this OS."""
+def find_config_dirs():
+    """Find Streamlink Twitch GUI config directories on this OS."""
     system = platform.system()
     home = os.path.expanduser("~")
+    dirs = []
 
     if system == "Windows":
-        # Windows: %APPDATA%\streamlink-twitch-gui
-        appdata = os.environ.get("APPDATA", os.path.join(home, "AppData", "Roaming"))
-        return os.path.join(appdata, "streamlink-twitch-gui")
+        # Windows: could be in Roaming OR Local (portable/installed version)
+        appdata_local = os.environ.get("LOCALAPPDATA", os.path.join(home, "AppData", "Local"))
+        appdata_roaming = os.environ.get("APPDATA", os.path.join(home, "AppData", "Roaming"))
+        dirs.append(os.path.join(appdata_local, "streamlink-twitch-gui"))
+        dirs.append(os.path.join(appdata_roaming, "streamlink-twitch-gui"))
     elif system == "Darwin":
-        # macOS: ~/Library/Application Support/streamlink-twitch-gui
-        return os.path.join(home, "Library", "Application Support", "streamlink-twitch-gui")
+        dirs.append(os.path.join(home, "Library", "Application Support", "streamlink-twitch-gui"))
     else:
-        # Linux: ~/.config/streamlink-twitch-gui
-        return os.path.join(home, ".config", "streamlink-twitch-gui")
+        dirs.append(os.path.join(home, ".config", "streamlink-twitch-gui"))
+
+    return dirs
 
 
 def extract_token(config_dir):
@@ -76,12 +79,21 @@ def main():
     print("=" * 60)
     print()
 
-    config_dir = find_config_dir()
-    print(f"Looking in: {config_dir}")
+    config_dirs = find_config_dirs()
+    print("Checking locations:")
+    for d in config_dirs:
+        exists = "EXISTS" if os.path.exists(d) else "not found"
+        print(f"  {d} [{exists}]")
     print()
 
-    if not os.path.exists(config_dir):
-        print(f"ERROR: Config directory not found: {config_dir}")
+    config_dir = None
+    for d in config_dirs:
+        if os.path.exists(d):
+            config_dir = d
+            break
+
+    if not config_dir:
+        print("ERROR: Config directory not found.")
         print()
         print("Have you installed and logged into Streamlink Twitch GUI on this PC?")
         print("  1. Download from https://github.com/streamlink/streamlink-twitch-gui/releases")
@@ -89,6 +101,9 @@ def main():
         print("  3. Log in to Twitch (this will work on your PC)")
         print("  4. Run this script again")
         return 1
+
+    print(f"Using: {config_dir}")
+    print()
 
     token, source = extract_token(config_dir)
 
