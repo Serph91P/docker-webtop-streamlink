@@ -24,7 +24,9 @@ if [ -n "$BROWSER" ]; then
     echo "[xdg-open] Launching $BROWSER with URL" | tee -a "$LOG"
     nohup "$BROWSER" \
         --ozone-platform=x11 \
-        --no-sandbox \
+        --disable-namespace-sandbox \
+        --disable-setuid-sandbox \
+        --disable-seccomp-filter-sandbox \
         --disable-dev-shm-usage \
         --no-first-run \
         --no-default-browser-check \
