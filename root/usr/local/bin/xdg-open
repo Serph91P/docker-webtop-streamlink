@@ -8,62 +8,23 @@ LOG="/tmp/streamlink-twitch-gui.log"
 
 echo "[xdg-open] URL: $URL" | tee -a "$LOG"
 
-# Ensure DISPLAY is set for X11 mode
-export DISPLAY="${DISPLAY:-:0}"
+# Twitch OAuth login is blocked in container browsers due to integrity checks.
+# Instead, use the Twitch OAuth Login desktop shortcut or run:
+#   python3 /usr/local/bin/twitch-oauth-device-flow
 
-# Prefer firefox inside the container so the user sees a real window
-BROWSER=""
-for cmd in firefox chromium chromium-browser google-chrome; do
-    if command -v "$cmd" >/dev/null 2>&1; then
-        BROWSER="$cmd"
-        break
-    fi
-done
+echo "[xdg-open] ==========================================" | tee -a "$LOG"
+echo "[xdg-open] TWITCH OAUTH LOGIN BLOCKED IN CONTAINER" | tee -a "$LOG"
+echo "[xdg-open] Browser integrity checks prevent login." | tee -a "$LOG"
+echo "[xdg-open] " | tee -a "$LOG"
+echo "[xdg-open] Use the 'Twitch OAuth Login' shortcut on the" | tee -a "$LOG"
+echo "[xdg-open] desktop, or run: python3 /usr/local/bin/twitch-oauth-device-flow" | tee -a "$LOG"
+echo "[xdg-open] " | tee -a "$LOG"
+echo "[xdg-open] Alternatively, set TWITCH_OAUTH_TOKEN env var and restart." | tee -a "$LOG"
+echo "[xdg-open] ==========================================" | tee -a "$LOG"
 
-if [ -n "$BROWSER" ] && [ "$BROWSER" = "firefox" ]; then
-    echo "[xdg-open] Launching Firefox with URL" | tee -a "$LOG"
-    nohup "$BROWSER" \
-        --no-remote \
-        --new-instance \
-        "$URL" > /tmp/firefox-oauth.log 2>&1 &
-    echo "[xdg-open] Firefox PID: $!" | tee -a "$LOG"
-    exit 0
-fi
-
-if [ -n "$BROWSER" ]; then
-    echo "[xdg-open] Launching $BROWSER with URL" | tee -a "$LOG"
-    nohup "$BROWSER" \
-        --ozone-platform=x11 \
-        --no-sandbox \
-        --disable-dev-shm-usage \
-        --no-first-run \
-        --no-default-browser-check \
-        --disable-background-networking \
-        --disable-background-timer-throttling \
-        --disable-default-apps \
-        --disable-hang-monitor \
-        --disable-popup-blocking \
-        --disable-prompt-on-repost \
-        --disable-sync \
-        --force-color-profile=srgb \
-        --password-store=basic \
-        --use-mock-keychain \
-        --disable-blink-features=AutomationControlled \
-        --disable-features=IsolateOrigins,site-per-process \
-        --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36" \
-        "$URL" > /tmp/chromium-oauth.log 2>&1 &
-    echo "[xdg-open] Chromium PID: $!" | tee -a "$LOG"
-    exit 0
-fi
-
-# Fallback: save URL and notify
+# Save URL for reference
 echo "$URL" > /tmp/oauth-url.txt
-echo "[xdg-open] ==========================================" | tee -a "$LOG"
-echo "[xdg-open] OAUTH LOGIN REQUIRED" | tee -a "$LOG"
-echo "[xdg-open] Open this URL in your browser:" | tee -a "$LOG"
-echo "[xdg-open] $URL" | tee -a "$LOG"
-echo "[xdg-open] ==========================================" | tee -a "$LOG"
 
-notify-send "Streamlink Twitch GUI" "OAuth URL copied to /tmp/oauth-url.txt" 2>/dev/null || true
+notify-send "Streamlink Twitch GUI" "Twitch login blocked in container. Use the Twitch OAuth Login shortcut on the desktop." 2>/dev/null || true
 
 exit 0

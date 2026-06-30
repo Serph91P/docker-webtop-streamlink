@@ -16,6 +16,12 @@ echo "[autostart] WAYLAND_DISPLAY=$WAYLAND_DISPLAY DISPLAY=$DISPLAY" | tee -a "$
 
 sleep 3
 
+# Auto-inject Twitch OAuth token if provided via environment variable
+if [ -n "${TWITCH_OAUTH_TOKEN:-}" ]; then
+    echo "[autostart] TWITCH_OAUTH_TOKEN detected, injecting token..." | tee -a "$LOG"
+    python3 /usr/local/bin/twitch-oauth-device-flow 2>&1 | tee -a "$LOG" || true
+fi
+
 # Make our OAuth URL visible
 echo "[autostart] OAuth URLs will be logged to /tmp/streamlink-twitch-gui.log" | tee -a "$LOG"
 

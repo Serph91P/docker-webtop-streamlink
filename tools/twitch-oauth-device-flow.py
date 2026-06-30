@@ -7,9 +7,9 @@ the container. The user opens the verification URL on their PC/phone and
 enters the displayed user code.
 
 Usage:
-    python3 twitch-oauth-device-flow.py
+    python3 /usr/local/bin/twitch-oauth-device-flow
 
-The token is saved to ~/.config/streamlink-twitch-gui/settings.json
+The token is saved to /config/.config/streamlink-twitch-gui/oauth.json
 and can also be manually copied into the Streamlink Twitch GUI.
 """
 
@@ -19,13 +19,13 @@ import sys
 import time
 import urllib.request
 import urllib.parse
+import urllib.error
 
 # Twitch OAuth Device Flow endpoints
 DEVICE_CODE_URL = "https://id.twitch.tv/oauth2/device"
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 
 # Streamlink Twitch GUI's public client ID
-# This is the same client ID the app uses for OAuth
 CLIENT_ID = "phiay4sq36lfv9zu7cbqwzkgndm8q43"
 
 # Required scopes for Streamlink Twitch GUI
@@ -95,22 +95,33 @@ def poll_for_token(device_code, interval=5, max_attempts=60):
     return None
 
 
-def save_token_to_settings(access_token):
-    """Save the access token to Streamlink Twitch GUI settings."""
+def save_token(access_token, refresh_token=None):
+    """Save the access token to Streamlink Twitch GUI config."""
     config_dir = os.path.expanduser("~/.config/streamlink-twitch-gui")
     settings_path = os.path.join(config_dir, "settings.json")
+    oauth_path = os.path.join(config_dir, "oauth.json")
 
-    # Create config directory if it doesn't exist
     os.makedirs(config_dir, exist_ok=True)
 
-    # Load existing settings or create new
+    # Save raw oauth data
+    oauth_data = {
+        "access_token": access_token,
+        "client_id": CLIENT_ID,
+        "scope": " ".join(SCOPES),
+    }
+    if refresh_token:
+        oauth_data["refresh_token"] = refresh_token
+
+    with open(oauth_path, "w") as f:
+        json.dump(oauth_data, f, indent=2)
+
+    # Update settings.json if it exists
     if os.path.exists(settings_path):
         with open(settings_path, "r") as f:
             settings = json.load(f)
     else:
         settings = {}
 
-    # Update auth settings
     if "auth" not in settings:
         settings["auth"] = {}
 
@@ -122,16 +133,50 @@ def save_token_to_settings(access_token):
         json.dump(settings, f, indent=2)
 
     print(f"Token saved to {settings_path}")
+    print(f"OAuth data saved to {oauth_path}")
+
+
+def inject_token_from_env():
+    """If TWITCH_OAUTH_TOKEN env var is set, inject it directly."""
+    token = os.environ.get("TWITCH_OAUTH_TOKEN", "")
+    if not token:
+        return False
+
+    # Strip oauth: prefix if present
+    if token.startswith("oauth:"):
+        token = token[6:]
+
+    print("Injecting OAuth token from TWITCH_OAUTH_TOKEN environment variable...")
+    save_token(token)
+    print("Token injected successfully. Restart Streamlink Twitch GUI to use it.")
+    return True
 
 
 def main():
+    # First try env var injection
+    if inject_token_from_env():
+        return 0
+
     print("=" * 60)
     print("Twitch OAuth Device Flow for Streamlink Twitch GUI")
     print("=" * 60)
     print()
 
     print("Step 1: Requesting device code from Twitch...")
-    device_info = request_device_code()
+    try:
+        device_info = request_device_code()
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"Device Flow failed: {e}", file=sys.stderr)
+        print()
+        print("Alternative: Generate a token on your PC using one of these methods:")
+        print("  1. Visit https://twitchtokengenerator.com/")
+        print("  2. Use the Twitch CLI: twitch token")
+        print("  3. Set the TWITCH_OAUTH_TOKEN environment variable on this container")
+        print()
+        print("Then set TWITCH_OAUTH_TOKEN and restart the container.")
+        return 1
 
     user_code = device_info["user_code"]
     verification_uri = device_info["verification_uri"]
@@ -154,6 +199,7 @@ def main():
 
     if result and "access_token" in result:
         access_token = result["access_token"]
+        refresh_token = result.get("refresh_token")
         print()
         print("=" * 60)
         print("SUCCESS! Twitch OAuth token received.")
@@ -162,8 +208,7 @@ def main():
         print(f"Access Token: {access_token[:20]}...")
         print()
 
-        # Save to settings
-        save_token_to_settings(access_token)
+        save_token(access_token, refresh_token)
 
         print()
         print("The token has been saved to Streamlink Twitch GUI settings.")

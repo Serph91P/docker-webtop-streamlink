@@ -74,7 +74,19 @@ RUN set -eux; \
         /var/lib/pacman/sync/*
 
 COPY root/ /
-
+COPY tools/twitch-oauth-device-flow.py /usr/local/bin/twitch-oauth-device-flow
+RUN chmod +x /usr/local/bin/twitch-oauth-device-flow && \
+    mkdir -p /config/Desktop && \
+    cat > /config/Desktop/Twitch-Login.desktop <<'EOF'
+[Desktop Entry]
+Name=Twitch OAuth Login
+Comment=Authenticate with Twitch using device flow
+Exec=python3 /usr/local/bin/twitch-oauth-device-flow
+Type=Application
+Terminal=true
+Icon=/usr/share/selkies/www/icon.png
+Categories=Network;
+EOF
 RUN chmod +x /defaults/autostart /defaults/autostart_wayland /defaults/startwm_wayland.sh /usr/local/bin/run-streamlink-twitch-gui && \
     echo "**** verify final image contents ****" && \
     ls -la /opt/streamlink-twitch-gui/streamlink-twitch-gui && \

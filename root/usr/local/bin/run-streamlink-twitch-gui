@@ -53,6 +53,12 @@ if [ ! -f "$HOME/.config/streamlink/config" ]; then
     printf '%s\n' "$default_streamlink_config" > "$HOME/.config/streamlink/config"
 fi
 
+# Auto-inject Twitch OAuth token if provided via environment variable
+if [ -n "${TWITCH_OAUTH_TOKEN:-}" ]; then
+    echo "[run-stg] TWITCH_OAUTH_TOKEN detected, injecting token..."
+    python3 /usr/local/bin/twitch-oauth-device-flow 2>&1 || true
+fi
+
 stg_executable="/opt/streamlink-twitch-gui/streamlink-twitch-gui"
 
 # Chromium / NW.js flags for container Wayland/X11 environments
