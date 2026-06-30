@@ -57,7 +57,7 @@ jobs:
           PY
           )
 
-          asset_name="${ASSET_NAME_PREFIX}${latest_version}${ASSET_NAME_SUFFIX}"
+          export ASSET_NAME="${ASSET_NAME_PREFIX}${latest_version}${ASSET_NAME_SUFFIX}"
 
           asset_url=$(python3 - <<'PY'
           import json, os
