@@ -41,10 +41,10 @@ if command -v xdg-user-dirs-update >/dev/null 2>&1; then
 fi
 
 # Default streamlink config for mpv
+# NOTE: --passthrough was removed in streamlink 7.0+
+# The wrapper script /usr/local/bin/streamlink-wrapper handles legacy args
 default_streamlink_config="[player]
 player=mpv --force-window=immediate --cache=yes --demuxer-max-bytes=500000000 --demuxer-readahead-secs=20
-[player.passthrough]
-passthrough=http,hls,rtmp
 [stream]
 hls-segment-threads=4
 ringbuffer-size=128M"

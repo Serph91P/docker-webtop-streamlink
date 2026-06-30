@@ -1,0 +1,27 @@
+#!/bin/bash
+# Wrapper für streamlink, der veraltete --passthrough Argumente filtert
+# Streamlink Twitch GUI übergibt --passthrough=http,hls,rtmp was in neuen
+# Streamlink Versionen nicht mehr unterstützt wird.
+
+args=("$@")
+filtered_args=()
+passthrough_found=false
+
+i=0
+while [ $i -lt ${#args[@]} ]; do
+    arg="${args[$i]}"
+    if [[ "$arg" == --passthrough=* ]]; then
+        passthrough_found=true
+        ((i++))
+        continue
+    fi
+    filtered_args+=("$arg")
+    ((i++))
+done
+
+if [ "$passthrough_found" = true ]; then
+    # Wenn --passthrough verwendet wird, rufen wir streamlink mit mpv als Player auf
+    exec /usr/bin/streamlink "${filtered_args[@]}" --player=mpv --player-args="--force-window=immediate --keep-open=no --cache=yes"
+else
+    exec /usr/bin/streamlink "$@"
+fi

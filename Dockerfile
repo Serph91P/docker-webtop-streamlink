@@ -19,6 +19,9 @@ ENV TITLE="Streamlink Twitch GUI" \
     NO_GAMEPAD=true \
     NO_DECOR=true
 
+# Copy root filesystem first (includes streamlink-wrapper)
+COPY root/ /
+
 RUN set -eux; \
     echo "**** cache bust ${CACHE_BUST:-none} ****"; \
     echo "**** install runtime packages ****"; \
@@ -38,13 +41,11 @@ RUN set -eux; \
         ttf-font \
         xdg-user-dirs \
         xdg-utils \
-        xorg-xwayland \
-        chromium \
-        firefox; \
-    echo "**** set firefox as default browser for OAuth ****"; \
-    mkdir -p /config/.config/xdg-settings; \
-    xdg-settings set default-web-browser firefox.desktop 2>/dev/null || true; \
-    ln -sf /usr/bin/chromium /usr/local/bin/chromium-browser 2>/dev/null || true; \
+        xorg-xwayland; \
+    echo "**** install streamlink wrapper for passthrough compatibility ****"; \
+    chmod +x /usr/local/bin/streamlink-wrapper; \
+    mv /usr/bin/streamlink /usr/bin/streamlink-real; \
+    ln -sf /usr/local/bin/streamlink-wrapper /usr/bin/streamlink; \
     echo "**** install Streamlink Twitch GUI ****"; \
     curl -fsSL -o /tmp/streamlink-twitch-gui.tar.gz \
         "https://github.com/streamlink/streamlink-twitch-gui/releases/download/v${STG_VERSION}/streamlink-twitch-gui-v${STG_VERSION}-linux64.tar.gz"; \
@@ -73,7 +74,6 @@ RUN set -eux; \
         /var/cache/pacman/pkg/* \
         /var/lib/pacman/sync/*
 
-COPY root/ /
 COPY tools/twitch-oauth-device-flow.py /usr/local/bin/twitch-oauth-device-flow
 RUN chmod +x /usr/local/bin/twitch-oauth-device-flow
 
